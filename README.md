@@ -1,0 +1,115 @@
+# GloBFP data retriever
+
+Download **cropped, small-block** building footprints from the
+[3D-GloBFP](https://essd.copernicus.org/articles/16/5357/2024/) dataset for just
+the area you care about — no whole-country downloads.
+
+You give it an **area of interest** (a lon/lat bounding box, a boundary polygon,
+or a local `.shp` / `.geojson` / `.json` file) and it:
+
+1. figures out which 3D-GloBFP **grid tiles** intersect that area,
+2. downloads **only those tiles** (zipped shapefiles on figshare),
+3. keeps the building footprints intersecting your AOI (with their `Height`),
+4. writes them to a single small file (GeoJSON by default).
+
+This is a Python re-implementation and extension of the ideas in the
+[`gloBFPr`](https://github.com/billbillbilly/gloBFPr) R package, adding **polygon
+and local-file AOI inputs** and **direct file output**.
+
+## How it works
+
+3D-GloBFP is published on figshare across ten articles. Every grid tile is a
+separate zipped shapefile whose name encodes its extent:
+
+```
+gridID_xmin_ymin_xmax_ymax.zip
+```
+
+`get_metadata()` reads the figshare files API for those articles, parses the file
+names into a grid of tile polygons + download URLs, and caches the result locally
+(`grid_index.geojson`). Retrieval then intersects your AOI with that grid and pulls
+only the matching tiles, caching each downloaded tile by `gridID` so repeated runs
+over the same area are fast.
+
+## Install
+
+```bash
+pip install -e .
+# or just the runtime dependencies:
+pip install -r requirements.txt
+```
+
+Requires Python ≥ 3.9 and `geopandas`, `shapely`, `pyproj`, `requests`, `pyogrio`.
+
+## Command-line usage
+
+```bash
+# By bounding box (min_lon min_lat max_lon max_lat), WGS84:
+globfp-retrieve --bbox -84.4855 45.6361 -84.4628 45.6506 -o buildings.geojson
+
+# By polygon ring:
+globfp-retrieve --polygon "-84.49,45.63 -84.46,45.63 -84.46,45.65 -84.49,45.65" -o area.geojson
+
+# From a local boundary file (.shp / .geojson / .json), reprojected automatically:
+globfp-retrieve my_boundary.geojson -o out.gpkg -f gpkg
+
+# Just see which tiles would be downloaded (no download):
+globfp-retrieve --bbox -84.49 45.63 -84.46 45.65 --list-tiles
+
+# Clip buildings exactly to the AOI boundary instead of keeping whole footprints:
+globfp-retrieve my_boundary.shp --clip -o clipped.geojson
+```
+
+Output format is inferred from the `-o` extension (or set with `-f`):
+`geojson` (default), `gpkg`, `shp`, `fgb`, `parquet`.
+
+## Python usage
+
+```python
+from globfp_retriever import retrieve_globfp
+
+# Bounding box
+gdf = retrieve_globfp((-84.4855, 45.6361, -84.4628, 45.6506),
+                      output="buildings.geojson")
+
+# Polygon ring of (lon, lat) pairs
+gdf = retrieve_globfp([(-84.49, 45.63), (-84.46, 45.63),
+                       (-84.46, 45.65), (-84.49, 45.65)])
+
+# Local file (any format geopandas can read); reprojected to WGS84 internally
+gdf = retrieve_globfp("my_boundary.shp", output="out.gpkg", out_format="gpkg")
+
+print(gdf.head())          # columns: Height, geometry  (EPSG:4326)
+```
+
+Useful options: `clip=True` (cut at the AOI boundary), `refresh_metadata=True`
+(rebuild the grid index), `cache_dir=...`, `use_tile_cache=False`.
+
+The grid index and tiles are cached under `~/.cache/globfp-retriever` by default
+(override with `--cache-dir` or the `GLOBFP_CACHE_DIR` environment variable).
+
+## Notes & limitations
+
+- **Network access is required** to reach `api.figshare.com` and
+  `ndownloader.figshare.com`. In restricted/sandboxed environments these hosts may
+  be blocked; run on a machine with outbound HTTPS to those domains.
+- AOIs crossing the antimeridian (±180° longitude) are not specially handled.
+- Building heights live in the `Height` attribute, as in the source data.
+
+## Data source & citation
+
+Data: **3D-GloBFP** building footprints with height
+([figshare](https://doi.org/10.6084/m9.figshare.c.7566563), grid index on
+[Zenodo](https://zenodo.org/records/15487037)).
+
+> Che, Y., Li, X., Liu, X., Wang, Y., Liao, W., Zheng, X., Zhang, X., Xu, X.,
+> Shi, Q., Zhu, J., Zhang, H., Yuan, H., & Dai, Y. (2024). 3D-GloBFP: the first
+> global three-dimensional building footprint dataset. *Earth System Science
+> Data*, 16, 5357–5374. https://doi.org/10.5194/essd-16-5357-2024
+
+Please cite the dataset authors when you use the data.
+
+## License
+
+Apache-2.0 (see [LICENSE](LICENSE)). The 3D-GloBFP data carries its own license
+from its authors.
