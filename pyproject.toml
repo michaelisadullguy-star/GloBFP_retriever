@@ -1,0 +1,32 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "globfp-retriever"
+version = "0.1.0"
+description = "Download and crop small-block 3D-GloBFP building footprints for an area of interest."
+readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "Apache-2.0" }
+keywords = ["GloBFP", "3D-GloBFP", "building footprints", "GIS", "figshare", "geopandas"]
+dependencies = [
+    "geopandas>=0.12",
+    "shapely>=2.0",
+    "pyproj>=3.0",
+    "requests>=2.25",
+    "pyogrio>=0.7",
+]
+
+[project.optional-dependencies]
+parquet = ["pyarrow>=10"]
+dev = ["pytest>=7"]
+
+[project.scripts]
+globfp-retrieve = "globfp_retriever.cli:main"
+
+[tool.setuptools]
+packages = ["globfp_retriever"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
