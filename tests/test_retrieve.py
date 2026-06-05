@@ -27,7 +27,35 @@ def test_keep_whole_building_uncut(monkeypatch, tmp_path, metadata_two_tiles, fa
     assert out.exists()
     reread = gpd.read_file(out)
     assert len(reread) == 1
-    assert "Height" in reread.columns
+    # Every feature is tagged building=yes alongside lowercase height, in the file too.
+    assert "height" in reread.columns
+    assert "building" in reread.columns
+    assert (reread["building"] == "yes").all()
+
+
+def test_building_tag_on_every_feature(monkeypatch, tmp_path, metadata_two_tiles, fake_tile_loader):
+    monkeypatch.setattr(R, "_load_tile", fake_tile_loader)
+    res = R.retrieve_globfp(
+        box(0.0, 0.0, 1.0, 1.0),  # whole tile 1: all three buildings
+        metadata=metadata_two_tiles,
+        cache_dir=tmp_path,
+    )
+    assert len(res) == 3
+    assert "building" in res.columns
+    assert (res["building"] == "yes").all()
+    # building should sit alongside height (lowercase), with geometry last.
+    assert list(res.columns) == ["height", "building", "geometry"]
+
+
+def test_building_tag_can_be_disabled(monkeypatch, tmp_path, metadata_two_tiles, fake_tile_loader):
+    monkeypatch.setattr(R, "_load_tile", fake_tile_loader)
+    res = R.retrieve_globfp(
+        box(0.0, 0.0, 1.0, 1.0),
+        metadata=metadata_two_tiles,
+        cache_dir=tmp_path,
+        building_tag=None,
+    )
+    assert "building" not in res.columns
 
 
 def test_clip_cuts_geometry(monkeypatch, tmp_path, metadata_two_tiles, fake_tile_loader):

@@ -23,7 +23,7 @@ parquet = ["pyarrow>=10"]
 dev = ["pytest>=7"]
 
 [project.scripts]
-globfp-retrieve = "globfp_retriever.cli:main"
+globfp-retriever = "globfp_retriever.cli:main"
 
 [tool.setuptools]
 packages = ["globfp_retriever"]

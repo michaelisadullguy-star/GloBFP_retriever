@@ -1,4 +1,4 @@
-# GloBFP data retriever
+# GloBFP-retriever
 
 Download **cropped, small-block** building footprints from the
 [3D-GloBFP](https://essd.copernicus.org/articles/16/5357/2024/) dataset for just
@@ -9,7 +9,7 @@ or a local `.shp` / `.geojson` / `.json` file) and it:
 
 1. figures out which 3D-GloBFP **grid tiles** intersect that area,
 2. downloads **only those tiles** (zipped shapefiles on figshare),
-3. keeps the building footprints intersecting your AOI (with their `Height`),
+3. keeps the building footprints intersecting your AOI (with their `height`),
 4. writes them to a single small file (GeoJSON by default).
 
 This is a Python re-implementation and extension of the ideas in the
@@ -45,19 +45,19 @@ Requires Python ≥ 3.9 and `geopandas`, `shapely`, `pyproj`, `requests`, `pyogr
 
 ```bash
 # By bounding box (min_lon min_lat max_lon max_lat), WGS84:
-globfp-retrieve --bbox -84.4855 45.6361 -84.4628 45.6506 -o buildings.geojson
+globfp-retriever --bbox -84.4855 45.6361 -84.4628 45.6506 -o buildings.geojson
 
 # By polygon ring:
-globfp-retrieve --polygon "-84.49,45.63 -84.46,45.63 -84.46,45.65 -84.49,45.65" -o area.geojson
+globfp-retriever --polygon "-84.49,45.63 -84.46,45.63 -84.46,45.65 -84.49,45.65" -o area.geojson
 
 # From a local boundary file (.shp / .geojson / .json), reprojected automatically:
-globfp-retrieve my_boundary.geojson -o out.gpkg -f gpkg
+globfp-retriever my_boundary.geojson -o out.gpkg -f gpkg
 
 # Just see which tiles would be downloaded (no download):
-globfp-retrieve --bbox -84.49 45.63 -84.46 45.65 --list-tiles
+globfp-retriever --bbox -84.49 45.63 -84.46 45.65 --list-tiles
 
 # Clip buildings exactly to the AOI boundary instead of keeping whole footprints:
-globfp-retrieve my_boundary.shp --clip -o clipped.geojson
+globfp-retriever my_boundary.shp --clip -o clipped.geojson
 ```
 
 Output format is inferred from the `-o` extension (or set with `-f`):
@@ -79,7 +79,7 @@ gdf = retrieve_globfp([(-84.49, 45.63), (-84.46, 45.63),
 # Local file (any format geopandas can read); reprojected to WGS84 internally
 gdf = retrieve_globfp("my_boundary.shp", output="out.gpkg", out_format="gpkg")
 
-print(gdf.head())          # columns: Height, geometry  (EPSG:4326)
+print(gdf.head())          # columns: height, building (="yes"), geometry  (EPSG:4326)
 ```
 
 Useful options: `clip=True` (cut at the AOI boundary), `refresh_metadata=True`
@@ -94,8 +94,9 @@ Because some environments block outbound access to figshare, the repo includes a
 workflow (`.github/workflows/retrieve-aoi.yml`) that runs the retrieval on a
 GitHub-hosted runner (which has internet). It downloads the tiles, crops to the
 AOI in `examples/dongshan_nanjing.geojson`, uploads the result as a build
-artifact, and commits the GeoPackage to `outputs/`. Trigger it via *Actions →
-Retrieve GloBFP for AOI → Run workflow*, or by pushing to the working branch.
+artifact, and (on a manual *Run workflow* dispatch) commits the GeoPackage to
+`outputs/`. Trigger it via *Actions → Retrieve GloBFP for AOI → Run workflow*, or
+by pushing to the working branch.
 
 ## Notes & limitations
 
@@ -103,7 +104,9 @@ Retrieve GloBFP for AOI → Run workflow*, or by pushing to the working branch.
   `ndownloader.figshare.com`. In restricted/sandboxed environments these hosts may
   be blocked; run on a machine with outbound HTTPS to those domains.
 - AOIs crossing the antimeridian (±180° longitude) are not specially handled.
-- Building heights live in the `Height` attribute, as in the source data.
+- Building heights are in a lowercase `height` attribute (OSM-style; the source
+  dataset names it `Height`). Every feature is also tagged `building=yes` (OSM
+  convention); pass `building_tag=None` to `retrieve_globfp` to omit it.
 
 ## Data source & citation
 

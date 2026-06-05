@@ -46,7 +46,7 @@ jobs:
           PY
 
       - name: List intersecting tiles
-        run: globfp-retrieve "$AOI" --cache-dir .globfp-cache --list-tiles -v
+        run: globfp-retriever "$AOI" --cache-dir .globfp-cache --list-tiles -v
 
       - name: Retrieve and crop (GeoJSON + GPKG)
         run: |
@@ -69,7 +69,8 @@ jobs:
           retention-days: 14
 
       - name: Commit GPKG output back to the branch
-        if: success()
+        # Only on a manual run, so routine pushes don't keep re-committing the output.
+        if: success() && github.event_name == 'workflow_dispatch'
         run: |
           mkdir -p outputs
           cp output/dongshan_buildings.gpkg outputs/dongshan_buildings.gpkg

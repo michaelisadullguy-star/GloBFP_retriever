@@ -36,11 +36,11 @@ def main(argv=None) -> int:
         print("No buildings intersect the AOI; nothing written.")
         return 0
 
-    if "Height" in gdf.columns:
-        heights = gdf["Height"].dropna()
+    if "height" in gdf.columns:
+        heights = gdf["height"].dropna()
         if len(heights):
             print(
-                f"Height (m): min={heights.min():.1f} "
+                f"height (m): min={heights.min():.1f} "
                 f"mean={heights.mean():.1f} max={heights.max():.1f}"
             )
 
