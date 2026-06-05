@@ -75,7 +75,7 @@ def retrieve_globfp(
     refresh_metadata=False,
     use_tile_cache=True,
     clip=False,
-    height_field="Height",
+    height_field="height",
     building_tag="yes",
     session=None,
     timeout=120,
@@ -100,6 +100,10 @@ def retrieve_globfp(
     clip
         If ``True``, clip building geometries to the AOI boundary. Default ``False``
         keeps whole buildings that intersect the AOI.
+    height_field
+        Output name for the height attribute. Defaults to ``"height"`` (lowercase,
+        OSM-style); the source's ``Height`` column is matched case-insensitively and
+        renamed to it.
     building_tag
         Value for an OSM-style ``building`` tag added to every feature. Defaults to
         ``"yes"``; pass ``None`` to omit the tag.
@@ -107,8 +111,9 @@ def retrieve_globfp(
     Returns
     -------
     geopandas.GeoDataFrame
-        Building footprints intersecting the AOI, in WGS84, with a ``Height`` column
-        and (by default) a ``building=yes`` column.
+        Building footprints intersecting the AOI, in WGS84, with a lowercase
+        ``height`` column (renamed from the source's ``Height``) and, by default,
+        a ``building=yes`` column.
     """
     aoi_geom = _aoi.load_aoi(aoi, layer=layer)
     cache_dir = Path(cache_dir) if cache_dir is not None else _metadata.default_cache_dir()
@@ -178,7 +183,7 @@ def retrieve_globfp(
         result = gpd.clip(result, _aoi.aoi_to_gdf(aoi_geom)).reset_index(drop=True)
         log.info("Clipped to AOI boundary: %d feature(s) remain", len(result))
 
-    # Tag every feature with an OSM-style building=yes alongside Height.
+    # Tag every feature with an OSM-style building=yes alongside height.
     if building_tag is not None:
         result["building"] = building_tag
         geom_name = result.geometry.name

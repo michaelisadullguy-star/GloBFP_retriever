@@ -27,8 +27,8 @@ def test_keep_whole_building_uncut(monkeypatch, tmp_path, metadata_two_tiles, fa
     assert out.exists()
     reread = gpd.read_file(out)
     assert len(reread) == 1
-    # Every feature is tagged building=yes alongside Height, in the file too.
-    assert "Height" in reread.columns
+    # Every feature is tagged building=yes alongside lowercase height, in the file too.
+    assert "height" in reread.columns
     assert "building" in reread.columns
     assert (reread["building"] == "yes").all()
 
@@ -43,8 +43,8 @@ def test_building_tag_on_every_feature(monkeypatch, tmp_path, metadata_two_tiles
     assert len(res) == 3
     assert "building" in res.columns
     assert (res["building"] == "yes").all()
-    # building should sit alongside Height, with geometry last.
-    assert list(res.columns) == ["Height", "building", "geometry"]
+    # building should sit alongside height (lowercase), with geometry last.
+    assert list(res.columns) == ["height", "building", "geometry"]
 
 
 def test_building_tag_can_be_disabled(monkeypatch, tmp_path, metadata_two_tiles, fake_tile_loader):
