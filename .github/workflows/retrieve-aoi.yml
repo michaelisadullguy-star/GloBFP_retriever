@@ -7,8 +7,6 @@ name: Retrieve GloBFP for AOI
 on:
   push:
     branches: ["claude/cool-newton-Szorb"]
-    paths-ignore:
-      - "outputs/**"
   workflow_dispatch:
     inputs:
       aoi:
