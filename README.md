@@ -1,4 +1,4 @@
-# GloBFP data retriever
+# GloBFP-retriever
 
 Download **cropped, small-block** building footprints from the
 [3D-GloBFP](https://essd.copernicus.org/articles/16/5357/2024/) dataset for just
@@ -45,19 +45,19 @@ Requires Python ≥ 3.9 and `geopandas`, `shapely`, `pyproj`, `requests`, `pyogr
 
 ```bash
 # By bounding box (min_lon min_lat max_lon max_lat), WGS84:
-globfp-retrieve --bbox -84.4855 45.6361 -84.4628 45.6506 -o buildings.geojson
+globfp-retriever --bbox -84.4855 45.6361 -84.4628 45.6506 -o buildings.geojson
 
 # By polygon ring:
-globfp-retrieve --polygon "-84.49,45.63 -84.46,45.63 -84.46,45.65 -84.49,45.65" -o area.geojson
+globfp-retriever --polygon "-84.49,45.63 -84.46,45.63 -84.46,45.65 -84.49,45.65" -o area.geojson
 
 # From a local boundary file (.shp / .geojson / .json), reprojected automatically:
-globfp-retrieve my_boundary.geojson -o out.gpkg -f gpkg
+globfp-retriever my_boundary.geojson -o out.gpkg -f gpkg
 
 # Just see which tiles would be downloaded (no download):
-globfp-retrieve --bbox -84.49 45.63 -84.46 45.65 --list-tiles
+globfp-retriever --bbox -84.49 45.63 -84.46 45.65 --list-tiles
 
 # Clip buildings exactly to the AOI boundary instead of keeping whole footprints:
-globfp-retrieve my_boundary.shp --clip -o clipped.geojson
+globfp-retriever my_boundary.shp --clip -o clipped.geojson
 ```
 
 Output format is inferred from the `-o` extension (or set with `-f`):

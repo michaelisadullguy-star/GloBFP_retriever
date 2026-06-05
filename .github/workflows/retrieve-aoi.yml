@@ -46,7 +46,7 @@ jobs:
           PY
 
       - name: List intersecting tiles
-        run: globfp-retrieve "$AOI" --cache-dir .globfp-cache --list-tiles -v
+        run: globfp-retriever "$AOI" --cache-dir .globfp-cache --list-tiles -v
 
       - name: Retrieve and crop (GeoJSON + GPKG)
         run: |

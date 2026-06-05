@@ -38,7 +38,7 @@ def _parse_polygon(text: str):
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        prog="globfp-retrieve",
+        prog="globfp-retriever",
         description=(
             "Download and crop 3D-GloBFP building footprints for a small area of "
             "interest. Only the grid tiles intersecting the AOI are downloaded."
