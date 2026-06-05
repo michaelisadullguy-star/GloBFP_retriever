@@ -48,6 +48,15 @@ def test_download_and_read_tile_cache_hit(tmp_path):
     assert set(gdf["Height"]) == {12.0, 7.5}
 
 
+def test_read_tile_bbox_filter(tmp_path):
+    zip_path = tmp_path / "tile.zip"
+    _make_tile_zip(zip_path, tmp_path)  # buildings at 0.1-0.2 and 0.6-0.7
+    # bbox covering only the first building.
+    gdf = D.read_tile(zip_path, bbox=(0.0, 0.0, 0.3, 0.3))
+    assert len(gdf) == 1
+    assert gdf.geometry.iloc[0].bounds[2] == pytest.approx(0.2)
+
+
 def test_read_tile_rejects_non_zip(tmp_path):
     bad = tmp_path / "not.zip"
     bad.write_text("not a zip")
