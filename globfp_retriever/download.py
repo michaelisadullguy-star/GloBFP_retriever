@@ -73,8 +73,13 @@ def extract_shapefiles(zip_path, extract_dir):
     return sorted(extract_dir.rglob("*.shp"))
 
 
-def read_tile(zip_path, extract_dir=None):
-    """Read a downloaded tile zip into a single WGS84 GeoDataFrame (or ``None``)."""
+def read_tile(zip_path, extract_dir=None, bbox=None):
+    """Read a downloaded tile zip into a single WGS84 GeoDataFrame (or ``None``).
+
+    ``bbox`` (min_lon, min_lat, max_lon, max_lat) restricts reading to features in
+    that window, so a huge tile is never loaded into memory in full. The dataset is
+    in WGS84, so the AOI bbox can be passed straight through.
+    """
     cleanup = extract_dir is None
     if extract_dir is None:
         extract_dir = Path(tempfile.mkdtemp(prefix="globfp_tile_"))
@@ -83,10 +88,11 @@ def read_tile(zip_path, extract_dir=None):
         if not shp_files:
             log.warning("No .shp found inside %s", zip_path)
             return None
+        read_kwargs = {"bbox": tuple(bbox)} if bbox is not None else {}
         frames = []
         for shp in shp_files:
             try:
-                frames.append(gpd.read_file(shp))
+                frames.append(gpd.read_file(shp, **read_kwargs))
             except Exception as err:  # noqa: BLE001 - skip unreadable parts, keep going
                 log.warning("Failed to read %s: %s", shp, err)
         if not frames:
@@ -118,8 +124,12 @@ def download_and_read_tile(
     session=None,
     timeout=120,
     retries=4,
+    bbox=None,
 ):
-    """Download (or reuse a cached) tile described by ``row`` and read it."""
+    """Download (or reuse a cached) tile described by ``row`` and read it.
+
+    ``bbox`` is forwarded to :func:`read_tile` to limit reading to the AOI window.
+    """
     url = row["download_url"]
     grid_id = row.get("gridID") if hasattr(row, "get") else row["gridID"]
 
@@ -129,12 +139,12 @@ def download_and_read_tile(
             log.info("Using cached tile %s", zip_path)
         else:
             download_file(url, zip_path, session=session, timeout=timeout, retries=retries)
-        return read_tile(zip_path)
+        return read_tile(zip_path, bbox=bbox)
 
     tmp_dir = Path(tempfile.mkdtemp(prefix="globfp_dl_"))
     try:
         zip_path = tmp_dir / f"{grid_id if grid_id is not None else 'tile'}.zip"
         download_file(url, zip_path, session=session, timeout=timeout, retries=retries)
-        return read_tile(zip_path)
+        return read_tile(zip_path, bbox=bbox)
     finally:
         shutil.rmtree(tmp_dir, ignore_errors=True)

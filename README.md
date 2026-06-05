@@ -88,6 +88,15 @@ Useful options: `clip=True` (cut at the AOI boundary), `refresh_metadata=True`
 The grid index and tiles are cached under `~/.cache/globfp-retriever` by default
 (override with `--cache-dir` or the `GLOBFP_CACHE_DIR` environment variable).
 
+## Reproducible AOI runs (GitHub Actions)
+
+Because some environments block outbound access to figshare, the repo includes a
+workflow (`.github/workflows/retrieve-aoi.yml`) that runs the retrieval on a
+GitHub-hosted runner (which has internet). It downloads the tiles, crops to the
+AOI in `examples/dongshan_nanjing.geojson`, uploads the result as a build
+artifact, and commits the GeoPackage to `outputs/`. Trigger it via *Actions →
+Retrieve GloBFP for AOI → Run workflow*, or by pushing to the working branch.
+
 ## Notes & limitations
 
 - **Network access is required** to reach `api.figshare.com` and

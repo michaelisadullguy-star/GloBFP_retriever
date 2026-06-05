@@ -42,7 +42,9 @@ def select_tiles(metadata: gpd.GeoDataFrame, aoi_geom) -> gpd.GeoDataFrame:
     return metadata.iloc[sorted(set(positions))]
 
 
-def _load_tile(row, cache_dir=None, use_cache=True, session=None, timeout=120, retries=4):
+def _load_tile(
+    row, cache_dir=None, use_cache=True, session=None, timeout=120, retries=4, bbox=None
+):
     """Indirection point so tests can stub tile downloading/reading."""
     return _download.download_and_read_tile(
         row,
@@ -51,6 +53,7 @@ def _load_tile(row, cache_dir=None, use_cache=True, session=None, timeout=120, r
         session=session,
         timeout=timeout,
         retries=retries,
+        bbox=bbox,
     )
 
 
@@ -120,6 +123,10 @@ def retrieve_globfp(
             _write_output(result, output, out_format)
         return result
 
+    # Restrict tile reading to the AOI's bounding window (huge tiles are never
+    # loaded into memory in full); precise polygon filtering happens afterwards.
+    aoi_bbox = aoi_geom.bounds
+
     frames = []
     for ordinal, (_, row) in enumerate(tiles.iterrows(), start=1):
         log.info(
@@ -135,6 +142,7 @@ def retrieve_globfp(
             session=session,
             timeout=timeout,
             retries=retries,
+            bbox=aoi_bbox,
         )
         if gdf is None or len(gdf) == 0:
             continue
