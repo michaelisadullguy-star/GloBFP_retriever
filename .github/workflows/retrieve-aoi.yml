@@ -7,12 +7,17 @@ name: Retrieve GloBFP for AOI
 on:
   push:
     branches: ["claude/cool-newton-Szorb"]
+    paths-ignore:
+      - "outputs/**"
   workflow_dispatch:
     inputs:
       aoi:
         description: "Path to the AOI file in the repo"
         default: "examples/dongshan_nanjing.geojson"
         required: false
+
+permissions:
+  contents: write
 
 jobs:
   retrieve:
@@ -64,3 +69,19 @@ jobs:
           path: output/
           if-no-files-found: warn
           retention-days: 14
+
+      - name: Commit GPKG output back to the branch
+        if: success()
+        run: |
+          mkdir -p outputs
+          cp output/dongshan_buildings.gpkg outputs/dongshan_buildings.gpkg
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          # outputs/*.gpkg is gitignored, so force-add the deliverable.
+          git add -f outputs/dongshan_buildings.gpkg
+          if git diff --staged --quiet; then
+            echo "No output changes to commit"
+          else
+            git commit -m "Add Dongshan GloBFP output (GPKG, 32k buildings) [skip ci]"
+            git push origin "HEAD:${GITHUB_REF_NAME}"
+          fi
