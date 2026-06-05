@@ -79,7 +79,7 @@ gdf = retrieve_globfp([(-84.49, 45.63), (-84.46, 45.63),
 # Local file (any format geopandas can read); reprojected to WGS84 internally
 gdf = retrieve_globfp("my_boundary.shp", output="out.gpkg", out_format="gpkg")
 
-print(gdf.head())          # columns: Height, geometry  (EPSG:4326)
+print(gdf.head())          # columns: Height, building (="yes"), geometry  (EPSG:4326)
 ```
 
 Useful options: `clip=True` (cut at the AOI boundary), `refresh_metadata=True`
@@ -103,7 +103,9 @@ Retrieve GloBFP for AOI → Run workflow*, or by pushing to the working branch.
   `ndownloader.figshare.com`. In restricted/sandboxed environments these hosts may
   be blocked; run on a machine with outbound HTTPS to those domains.
 - AOIs crossing the antimeridian (±180° longitude) are not specially handled.
-- Building heights live in the `Height` attribute, as in the source data.
+- Building heights live in the `Height` attribute, as in the source data. Every
+  feature is also tagged `building=yes` (OSM convention); pass `building_tag=None`
+  to `retrieve_globfp` to omit it.
 
 ## Data source & citation
 

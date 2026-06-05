@@ -57,8 +57,11 @@ def _load_tile(
     )
 
 
-def _empty_result(height_field):
-    return gpd.GeoDataFrame({height_field: []}, geometry=[], crs=WGS84)
+def _empty_result(height_field, building_tag="yes"):
+    data = {height_field: []}
+    if building_tag is not None:
+        data["building"] = []
+    return gpd.GeoDataFrame(data, geometry=[], crs=WGS84)
 
 
 def retrieve_globfp(
@@ -73,6 +76,7 @@ def retrieve_globfp(
     use_tile_cache=True,
     clip=False,
     height_field="Height",
+    building_tag="yes",
     session=None,
     timeout=120,
     retries=4,
@@ -96,11 +100,15 @@ def retrieve_globfp(
     clip
         If ``True``, clip building geometries to the AOI boundary. Default ``False``
         keeps whole buildings that intersect the AOI.
+    building_tag
+        Value for an OSM-style ``building`` tag added to every feature. Defaults to
+        ``"yes"``; pass ``None`` to omit the tag.
 
     Returns
     -------
     geopandas.GeoDataFrame
-        Building footprints (with their ``Height``) intersecting the AOI, in WGS84.
+        Building footprints intersecting the AOI, in WGS84, with a ``Height`` column
+        and (by default) a ``building=yes`` column.
     """
     aoi_geom = _aoi.load_aoi(aoi, layer=layer)
     cache_dir = Path(cache_dir) if cache_dir is not None else _metadata.default_cache_dir()
@@ -118,7 +126,7 @@ def retrieve_globfp(
     log.info("%d grid tile(s) intersect the AOI", len(tiles))
     if len(tiles) == 0:
         log.warning("No tiles intersect the AOI; returning an empty result")
-        result = _empty_result(height_field)
+        result = _empty_result(height_field, building_tag)
         if output:
             _write_output(result, output, out_format)
         return result
@@ -152,7 +160,7 @@ def retrieve_globfp(
 
     if not frames:
         log.warning("No building features read from tiles; returning an empty result")
-        result = _empty_result(height_field)
+        result = _empty_result(height_field, building_tag)
         if output:
             _write_output(result, output, out_format)
         return result
@@ -169,6 +177,14 @@ def retrieve_globfp(
     if clip:
         result = gpd.clip(result, _aoi.aoi_to_gdf(aoi_geom)).reset_index(drop=True)
         log.info("Clipped to AOI boundary: %d feature(s) remain", len(result))
+
+    # Tag every feature with an OSM-style building=yes alongside Height.
+    if building_tag is not None:
+        result["building"] = building_tag
+        geom_name = result.geometry.name
+        front = [c for c in (height_field, "building") if c in result.columns]
+        rest = [c for c in result.columns if c not in front and c != geom_name]
+        result = result[front + rest + [geom_name]]
 
     if output:
         _write_output(result, output, out_format)
