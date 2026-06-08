@@ -64,13 +64,17 @@ globfp-retriever --bbox -84.49 45.63 -84.46 45.65 -o buildings.obj
 ```
 
 Output format is inferred from the `-o` extension (or set with `-f`):
-`geojson` (default), `gpkg`, `shp`, `fgb`, `parquet`, `obj`.
+`geojson` (default), `gpkg`, `shp`, `fgb`, `parquet`, `obj`, `osm`.
 
 `obj` is a 3D export: each footprint is extruded from the ground to its `height`
 into a closed solid (walls + roof + floor). Coordinates are projected to local
 UTM metres and shifted near the origin, with axes `X=east, Y=north, Z=up`.
 Footprints without a usable height fall back to a 3&nbsp;m default. (Roofs of
 strongly non-convex footprints use an approximate triangulation; walls are exact.)
+
+`osm` writes OpenStreetMap XML: each footprint becomes a closed way (or a
+`type=multipolygon` relation when it has holes) carrying its attributes as tags
+(`building=yes`, `height=...`), with new objects using negative ids.
 
 ## Python usage
 
@@ -102,10 +106,10 @@ The grid index and tiles are cached under `~/.cache/globfp-retriever` by default
 Because some environments block outbound access to figshare, the repo includes a
 workflow (`.github/workflows/retrieve-aoi.yml`) that runs the retrieval on a
 GitHub-hosted runner (which has internet). It downloads the tiles, crops to the
-AOI in `examples/dongshan_nanjing.geojson`, uploads the result as a build
-artifact, and (on a manual *Run workflow* dispatch) commits the GeoPackage to
-`outputs/`. Trigger it via *Actions → Retrieve GloBFP for AOI → Run workflow*, or
-by pushing to the working branch.
+AOI in `examples/nanjing_subdistricts.geojson` (override with the `aoi` input),
+writes GeoJSON + OSM, uploads them as a build artifact, and commits the gzipped
+outputs to `outputs/`. Trigger it via *Actions → Retrieve GloBFP for AOI → Run
+workflow*, or by pushing to the working branch.
 
 ## Notes & limitations
 
