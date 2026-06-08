@@ -58,10 +58,19 @@ globfp-retriever --bbox -84.49 45.63 -84.46 45.65 --list-tiles
 
 # Clip buildings exactly to the AOI boundary instead of keeping whole footprints:
 globfp-retriever my_boundary.shp --clip -o clipped.geojson
+
+# Extrude footprints to 3D building solids (Wavefront OBJ):
+globfp-retriever --bbox -84.49 45.63 -84.46 45.65 -o buildings.obj
 ```
 
 Output format is inferred from the `-o` extension (or set with `-f`):
-`geojson` (default), `gpkg`, `shp`, `fgb`, `parquet`.
+`geojson` (default), `gpkg`, `shp`, `fgb`, `parquet`, `obj`.
+
+`obj` is a 3D export: each footprint is extruded from the ground to its `height`
+into a closed solid (walls + roof + floor). Coordinates are projected to local
+UTM metres and shifted near the origin, with axes `X=east, Y=north, Z=up`.
+Footprints without a usable height fall back to a 3&nbsp;m default. (Roofs of
+strongly non-convex footprints use an approximate triangulation; walls are exact.)
 
 ## Python usage
 

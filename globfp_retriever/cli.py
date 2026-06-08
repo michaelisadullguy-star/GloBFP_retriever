@@ -19,6 +19,7 @@ _DEFAULT_EXT = {
     "shp": "shp",
     "fgb": "fgb",
     "parquet": "parquet",
+    "obj": "obj",
 }
 
 
@@ -67,8 +68,9 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "-f",
         "--format",
-        choices=["geojson", "gpkg", "shp", "fgb", "parquet"],
-        help="Output format (default: inferred from --output, else geojson)",
+        choices=["geojson", "gpkg", "shp", "fgb", "parquet", "obj"],
+        help="Output format (default: inferred from --output, else geojson). "
+        "'obj' extrudes footprints to 3D building solids by their height.",
     )
     parser.add_argument("--layer", help="Layer name when the AOI file has multiple layers")
     parser.add_argument("--cache-dir", help="Directory for the grid index + tile cache")
