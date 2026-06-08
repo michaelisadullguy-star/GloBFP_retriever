@@ -94,7 +94,8 @@ def retrieve_globfp(
         ``out_format`` is given.
     out_format
         Explicit output format: ``geojson`` (default), ``gpkg``, ``shp``, ``fgb``,
-        ``parquet`` or ``obj`` (3D extrusion of footprints by their height).
+        ``parquet``, ``obj`` (3D extrusion of footprints by their height) or
+        ``osm`` (OpenStreetMap XML).
     metadata
         Pre-built grid index. If omitted it is loaded/cached via the figshare API.
     clip
@@ -229,12 +230,22 @@ def _is_obj_target(output: Path, out_format) -> bool:
     return output.suffix.lower() == ".obj"
 
 
+def _is_osm_target(output: Path, out_format) -> bool:
+    if out_format is not None:
+        return out_format.lower() == "osm"
+    return output.suffix.lower() == ".osm"
+
+
 def _write_output(gdf: gpd.GeoDataFrame, output, out_format=None, *, height_field="height"):
     output = Path(output)
     if _is_obj_target(output, out_format):
         from .obj_export import write_obj
 
         return write_obj(gdf, output, height_field=height_field)
+    if _is_osm_target(output, out_format):
+        from .osm_export import write_osm
+
+        return write_osm(gdf, output, height_field=height_field)
 
     driver = _resolve_driver(output, out_format)
     output.parent.mkdir(parents=True, exist_ok=True)

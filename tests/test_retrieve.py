@@ -74,6 +74,26 @@ def test_obj_output_extrudes_buildings(monkeypatch, tmp_path, metadata_two_tiles
     assert f"# solids: {len(res)}" in lines[1]  # one solid per retrieved footprint
 
 
+def test_osm_output_writes_buildings(monkeypatch, tmp_path, metadata_two_tiles, fake_tile_loader):
+    import xml.etree.ElementTree as ET
+
+    monkeypatch.setattr(R, "_load_tile", fake_tile_loader)
+    out = tmp_path / "buildings.osm"
+    res = R.retrieve_globfp(
+        box(0.0, 0.0, 1.0, 1.0),
+        output=str(out),
+        metadata=metadata_two_tiles,
+        cache_dir=tmp_path,
+    )
+    assert out.exists()
+    root = ET.fromstring(out.read_text())
+    ways = root.findall("way")
+    assert len(ways) == len(res)  # one way per (simple) footprint
+    tags = {t.get("k"): t.get("v") for t in ways[0].findall("tag")}
+    assert tags["building"] == "yes"
+    assert "height" in tags
+
+
 def test_clip_cuts_geometry(monkeypatch, tmp_path, metadata_two_tiles, fake_tile_loader):
     monkeypatch.setattr(R, "_load_tile", fake_tile_loader)
     res = R.retrieve_globfp(

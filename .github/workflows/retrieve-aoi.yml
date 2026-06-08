@@ -1,8 +1,9 @@
 name: Retrieve GloBFP for AOI
 
 # Runs on a GitHub-hosted runner (which has outbound internet to figshare), so it
-# can actually download the 3D-GloBFP tiles, crop them to the AOI, and upload the
-# cropped buildings as a downloadable artifact.
+# can actually download the 3D-GloBFP tiles, crop them to the AOI, and write the
+# cropped buildings as GeoJSON + OSM (uploaded as an artifact and committed back
+# gzipped).
 
 on:
   push:
@@ -11,7 +12,7 @@ on:
     inputs:
       aoi:
         description: "Path to the AOI file in the repo"
-        default: "examples/dongshan_nanjing.geojson"
+        default: "examples/nanjing_subdistricts.geojson"
         required: false
 
 permissions:
@@ -22,7 +23,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 180
     env:
-      AOI: ${{ github.event.inputs.aoi || 'examples/dongshan_nanjing.geojson' }}
+      AOI: ${{ github.event.inputs.aoi || 'examples/nanjing_subdistricts.geojson' }}
+      STEM: nanjing_buildings
     steps:
       - uses: actions/checkout@v4
 
@@ -35,25 +37,14 @@ jobs:
           python -m pip install --upgrade pip
           pip install -e .
 
-      - name: Probe figshare API (sanity-check naming)
-        run: |
-          python - <<'PY'
-          from globfp_retriever import metadata as M
-          files = M.fetch_article_files(M.FIGSHARE_ARTICLES[0])
-          print("file count in first article:", len(files))
-          for f in files[:5]:
-              print({k: f.get(k) for k in ("id", "name", "size", "download_url")})
-          PY
-
       - name: List intersecting tiles
         run: globfp-retriever "$AOI" --cache-dir .globfp-cache --list-tiles -v
 
-      - name: Retrieve and crop (GeoJSON + GPKG)
+      - name: Retrieve and crop (GeoJSON + OSM)
         run: |
-          python scripts/run_aoi.py "$AOI" \
-            --cache-dir .globfp-cache \
-            --outdir output \
-            --stem dongshan_buildings
+          mkdir -p output
+          globfp-retriever "$AOI" --cache-dir .globfp-cache -o "output/${STEM}.geojson" -v
+          globfp-retriever "$AOI" --cache-dir .globfp-cache -o "output/${STEM}.osm" -v
 
       - name: Output summary
         if: always()
@@ -63,24 +54,23 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: dongshan-globfp
+          name: nanjing-globfp
           path: output/
           if-no-files-found: warn
           retention-days: 14
 
-      - name: Commit GPKG output back to the branch
-        # Only on a manual run, so routine pushes don't keep re-committing the output.
-        if: success() && github.event_name == 'workflow_dispatch'
+      - name: Commit gzipped outputs back to the branch
+        if: success()
         run: |
           mkdir -p outputs
-          cp output/dongshan_buildings.gpkg outputs/dongshan_buildings.gpkg
+          gzip -n -9 -c "output/${STEM}.geojson" > "outputs/${STEM}.geojson.gz"
+          gzip -n -9 -c "output/${STEM}.osm" > "outputs/${STEM}.osm.gz"
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          # outputs/*.gpkg is gitignored, so force-add the deliverable.
-          git add -f outputs/dongshan_buildings.gpkg
+          git add -f "outputs/${STEM}.geojson.gz" "outputs/${STEM}.osm.gz"
           if git diff --staged --quiet; then
             echo "No output changes to commit"
           else
-            git commit -m "Add Dongshan GloBFP output (GPKG, 32k buildings) [skip ci]"
+            git commit -m "Add Nanjing GloBFP output (GeoJSON + OSM, gzipped) [skip ci]"
             git push origin "HEAD:${GITHUB_REF_NAME}"
           fi
