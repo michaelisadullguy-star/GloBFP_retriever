@@ -58,6 +58,22 @@ def test_building_tag_can_be_disabled(monkeypatch, tmp_path, metadata_two_tiles,
     assert "building" not in res.columns
 
 
+def test_obj_output_extrudes_buildings(monkeypatch, tmp_path, metadata_two_tiles, fake_tile_loader):
+    monkeypatch.setattr(R, "_load_tile", fake_tile_loader)
+    out = tmp_path / "buildings.obj"
+    res = R.retrieve_globfp(
+        box(0.0, 0.0, 1.0, 1.0),
+        output=str(out),
+        metadata=metadata_two_tiles,
+        cache_dir=tmp_path,
+    )
+    assert out.exists()
+    lines = out.read_text().splitlines()
+    assert any(ln.startswith("v ") for ln in lines)
+    assert any(ln.startswith("f ") for ln in lines)
+    assert f"# solids: {len(res)}" in lines[1]  # one solid per retrieved footprint
+
+
 def test_clip_cuts_geometry(monkeypatch, tmp_path, metadata_two_tiles, fake_tile_loader):
     monkeypatch.setattr(R, "_load_tile", fake_tile_loader)
     res = R.retrieve_globfp(

@@ -93,8 +93,8 @@ def retrieve_globfp(
         Optional output path. Format is inferred from its extension unless
         ``out_format`` is given.
     out_format
-        Explicit output format: ``geojson`` (default), ``gpkg``, ``shp``, ``fgb`` or
-        ``parquet``.
+        Explicit output format: ``geojson`` (default), ``gpkg``, ``shp``, ``fgb``,
+        ``parquet`` or ``obj`` (3D extrusion of footprints by their height).
     metadata
         Pre-built grid index. If omitted it is loaded/cached via the figshare API.
     clip
@@ -133,7 +133,7 @@ def retrieve_globfp(
         log.warning("No tiles intersect the AOI; returning an empty result")
         result = _empty_result(height_field, building_tag)
         if output:
-            _write_output(result, output, out_format)
+            _write_output(result, output, out_format, height_field=height_field)
         return result
 
     # Restrict tile reading to the AOI's bounding window (huge tiles are never
@@ -167,7 +167,7 @@ def retrieve_globfp(
         log.warning("No building features read from tiles; returning an empty result")
         result = _empty_result(height_field, building_tag)
         if output:
-            _write_output(result, output, out_format)
+            _write_output(result, output, out_format, height_field=height_field)
         return result
 
     combined = gpd.GeoDataFrame(
@@ -223,8 +223,19 @@ def _resolve_driver(output: Path, out_format):
     return driver
 
 
-def _write_output(gdf: gpd.GeoDataFrame, output, out_format=None):
+def _is_obj_target(output: Path, out_format) -> bool:
+    if out_format is not None:
+        return out_format.lower() == "obj"
+    return output.suffix.lower() == ".obj"
+
+
+def _write_output(gdf: gpd.GeoDataFrame, output, out_format=None, *, height_field="height"):
     output = Path(output)
+    if _is_obj_target(output, out_format):
+        from .obj_export import write_obj
+
+        return write_obj(gdf, output, height_field=height_field)
+
     driver = _resolve_driver(output, out_format)
     output.parent.mkdir(parents=True, exist_ok=True)
 
