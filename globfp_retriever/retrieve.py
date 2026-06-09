@@ -77,6 +77,7 @@ def retrieve_globfp(
     clip=False,
     height_field="height",
     building_tag="yes",
+    encrypt=False,
     session=None,
     timeout=120,
     retries=4,
@@ -108,6 +109,10 @@ def retrieve_globfp(
     building_tag
         Value for an OSM-style ``building`` tag added to every feature. Defaults to
         ``"yes"``; pass ``None`` to omit the tag.
+    encrypt
+        If ``True``, apply the keyed grid-cipher (:mod:`globfp_retriever.geocrypt`)
+        sub-metre obfuscation to the output. The secret key is read from
+        ``$GLOBFP_GEOCRYPT_KEY`` / a key file and is never logged or written out.
 
     Returns
     -------
@@ -192,8 +197,15 @@ def retrieve_globfp(
         rest = [c for c in result.columns if c not in front and c != geom_name]
         result = result[front + rest + [geom_name]]
 
+    # Optional keyed grid-cipher obfuscation (sub-metre, reversible with the key).
+    if encrypt:
+        from . import geocrypt
+
+        log.warning("Applying geocrypt grid cipher to output (key kept secret).")
+        result = geocrypt.encrypt_gdf(result)
+
     if output:
-        _write_output(result, output, out_format)
+        _write_output(result, output, out_format, height_field=height_field)
     return result
 
 
