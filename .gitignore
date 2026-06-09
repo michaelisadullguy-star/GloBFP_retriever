@@ -18,3 +18,8 @@ globfp_buildings.*
 
 # OS
 .DS_Store
+
+# Secret geocrypt key material - MUST never be committed
+.geocrypt.key
+*.key
+*.keyfile

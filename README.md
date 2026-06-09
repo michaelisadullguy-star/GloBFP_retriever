@@ -111,6 +111,37 @@ writes GeoJSON + OSM, uploads them as a build artifact, and commits the gzipped
 outputs to `outputs/`. Trigger it via *Actions → Retrieve GloBFP for AOI → Run
 workflow*, or by pushing to the working branch.
 
+## Coordinate obfuscation (grid cipher)
+
+`globfp_retriever.geocrypt` applies a **keyed, multi-resolution, sub-metre
+displacement field** to coordinates — a reversible watermark/obfuscation (not
+content encryption). Five layers act on the data: the original coordinates plus
+four grids (7 km, 3 km, 1 km, 300 m). On each grid every cell **corner** gets a
+pseudo-random offset (a keyed PRF of its integer grid index, so neighbouring
+cells agree on shared corners), within `±0.4 / ±0.2 / ±0.1 / ±0.05` m
+respectively. Points inside a cell are warped by **bilinear interpolation** of
+the four corner offsets (continuous across cells, growing toward the periphery),
+and the per-node offsets are **summed across layers** and added. The result
+stays usable (nearby points move almost identically) yet carries a hidden,
+owner-only-reversible fingerprint.
+
+```bash
+export GLOBFP_GEOCRYPT_KEY=$(python -c "import secrets;print(secrets.token_hex(32))")
+globfp-retriever my_aoi.geojson -o buildings.osm --encrypt
+```
+
+```python
+from globfp_retriever import geocrypt
+enc = geocrypt.encrypt_gdf(gdf)          # key from $GLOBFP_GEOCRYPT_KEY / key file
+orig = geocrypt.decrypt_gdf(enc)         # round-trips to sub-micrometre
+```
+
+**Key confidentiality:** the secret key/seed is read from `$GLOBFP_GEOCRYPT_KEY`
+or a git-ignored key file (`.geocrypt.key`, `chmod 600`), generated on first use.
+Its value is never printed, logged, written into any output, committed, or
+transmitted — without it the offsets cannot be predicted or removed. Keep it
+backed up: lose the key and you lose the ability to recover the true coordinates.
+
 ## Notes & limitations
 
 - **Network access is required** to reach `api.figshare.com` and

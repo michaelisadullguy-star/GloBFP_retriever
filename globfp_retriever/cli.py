@@ -91,6 +91,12 @@ def build_parser() -> argparse.ArgumentParser:
         help="Clip buildings to the AOI boundary (default: keep whole buildings)",
     )
     parser.add_argument(
+        "--encrypt",
+        action="store_true",
+        help="Apply the keyed grid-cipher obfuscation to the output (secret key "
+        "from $GLOBFP_GEOCRYPT_KEY or a key file; never printed or transmitted)",
+    )
+    parser.add_argument(
         "--list-tiles",
         action="store_true",
         help="List the grid tiles intersecting the AOI and exit (no download)",
@@ -162,6 +168,7 @@ def main(argv=None) -> int:
         refresh_metadata=args.refresh_metadata,
         use_tile_cache=not args.no_tile_cache,
         clip=args.clip,
+        encrypt=args.encrypt,
         timeout=args.timeout,
         retries=args.retries,
     )
