@@ -94,6 +94,30 @@ def test_osm_output_writes_buildings(monkeypatch, tmp_path, metadata_two_tiles, 
     assert "height" in tags
 
 
+def test_written_output_is_watermarked_but_return_is_clean(
+    monkeypatch, tmp_path, metadata_two_tiles, fake_tile_loader
+):
+    import numpy as np
+    import shapely
+
+    monkeypatch.setattr(R, "_load_tile", fake_tile_loader)
+    out = tmp_path / "b.geojson"
+    res = R.retrieve_globfp(
+        box(0.0, 0.0, 1.0, 1.0),
+        output=str(out),
+        metadata=metadata_two_tiles,
+        cache_dir=tmp_path,
+    )
+    written = gpd.read_file(out)
+    assert len(written) == len(res)
+    mcrs = res.estimate_utm_crs()
+    a = shapely.get_coordinates(res.to_crs(mcrs).geometry.values)
+    b = shapely.get_coordinates(written.to_crs(mcrs).geometry.values)
+    dmax = np.abs(a - b).max()
+    assert dmax > 1e-3  # the written file is grid-ciphered (mandatory, backend-only)
+    assert dmax < 1.0   # but only by sub-metre offsets
+
+
 def test_clip_cuts_geometry(monkeypatch, tmp_path, metadata_two_tiles, fake_tile_loader):
     monkeypatch.setattr(R, "_load_tile", fake_tile_loader)
     res = R.retrieve_globfp(

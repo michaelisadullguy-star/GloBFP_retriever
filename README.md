@@ -68,6 +68,9 @@ globfp-retriever --bbox -84.49 45.63 -84.46 45.65 --list-tiles
 # Clip buildings exactly to the AOI boundary instead of keeping whole footprints:
 globfp-retriever my_boundary.shp --clip -o clipped.geojson
 
+# Optional cleaning filters (all off by default; drop tiny / duplicate / triangular footprints):
+globfp-retriever my_boundary.geojson --min-area 10 --drop-duplicates --drop-triangles -o clean.geojson
+
 # Extrude footprints to 3D building solids (Wavefront OBJ):
 globfp-retriever --bbox -84.49 45.63 -84.46 45.65 -o buildings.obj
 ```
@@ -134,9 +137,12 @@ and the per-node offsets are **summed across layers** and added. The result
 stays usable (nearby points move almost identically) yet carries a hidden,
 owner-only-reversible fingerprint.
 
+Watermarking is applied **automatically** to every written output by the backend
+— there is no CLI/front-end switch. Set a persistent secret key so you keep
+control and can reverse it later (otherwise a fresh key is generated per run):
+
 ```bash
 export GLOBFP_GEOCRYPT_KEY=$(python -c "import secrets;print(secrets.token_hex(32))")
-globfp-retriever my_aoi.geojson -o buildings.osm --encrypt
 ```
 
 ```python
