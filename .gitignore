@@ -11,6 +11,9 @@ venv/
 
 # Local caches and outputs
 .cache/
+.globfp-cache/
+output/
+outputs/
 globfp_buildings.*
 *.gpkg
 *.fgb

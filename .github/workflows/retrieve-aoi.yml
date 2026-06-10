@@ -1,30 +1,40 @@
 name: Retrieve GloBFP for AOI
 
-# Runs on a GitHub-hosted runner (which has outbound internet to figshare), so it
-# can actually download the 3D-GloBFP tiles, crop them to the AOI, and write the
-# cropped buildings as GeoJSON + OSM (uploaded as an artifact and committed back
-# gzipped).
+# Retrieval needs outbound HTTPS to api.figshare.com / ndownloader.figshare.com,
+# which some environments block. This workflow runs the CLI on a GitHub-hosted
+# runner (which has internet) and uploads the cropped result as a build
+# artifact; nothing is committed to the repository.
 
 on:
-  push:
-    branches: ["claude/cool-newton-Szorb"]
   workflow_dispatch:
     inputs:
       aoi:
-        description: "Path to the AOI file in the repo"
-        default: "examples/nanjing_subdistricts.geojson"
+        description: "AOI: repo path to a boundary file (.shp/.geojson/.json) or a WKT polygon"
         required: false
+        type: string
+      bbox:
+        description: "AOI bounding box: min_lon min_lat max_lon max_lat (WGS84)"
+        required: false
+        type: string
+      format:
+        description: "Output format"
+        required: false
+        default: "geojson"
+        type: choice
+        options: [geojson, gpkg, shp, fgb, parquet, obj, osm]
+      clip:
+        description: "Clip buildings to the AOI boundary"
+        required: false
+        default: false
+        type: boolean
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   retrieve:
     runs-on: ubuntu-latest
     timeout-minutes: 180
-    env:
-      AOI: ${{ github.event.inputs.aoi || 'examples/nanjing_subdistricts.geojson' }}
-      STEM: nanjing_buildings
     steps:
       - uses: actions/checkout@v4
 
@@ -37,40 +47,31 @@ jobs:
           python -m pip install --upgrade pip
           pip install -e .
 
-      - name: List intersecting tiles
-        run: globfp-retriever "$AOI" --cache-dir .globfp-cache --list-tiles -v
-
-      - name: Retrieve and crop (GeoJSON + OSM)
+      - name: Retrieve and crop
+        env:
+          AOI: ${{ inputs.aoi }}
+          BBOX: ${{ inputs.bbox }}
+          FORMAT: ${{ inputs.format }}
+          CLIP: ${{ inputs.clip }}
         run: |
+          if [ -z "$AOI" ] && [ -z "$BBOX" ]; then
+            echo "Provide either the 'aoi' input (file path or WKT) or the 'bbox' input." >&2
+            exit 1
+          fi
           mkdir -p output
-          globfp-retriever "$AOI" --cache-dir .globfp-cache -o "output/${STEM}.geojson" -v
-          globfp-retriever "$AOI" --cache-dir .globfp-cache -o "output/${STEM}.osm" -v
-
-      - name: Output summary
-        if: always()
-        run: ls -lh output || echo "no output directory produced"
+          args=(--cache-dir .globfp-cache -f "$FORMAT" -o "output/buildings.$FORMAT" -v)
+          if [ "$CLIP" = "true" ]; then
+            args+=(--clip)
+          fi
+          if [ -n "$AOI" ]; then
+            globfp-retriever "$AOI" "${args[@]}"
+          else
+            globfp-retriever --bbox $BBOX "${args[@]}"
+          fi
 
       - name: Upload result artifact
-        if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: nanjing-globfp
+          name: globfp-aoi-output
           path: output/
-          if-no-files-found: warn
           retention-days: 14
-
-      - name: Commit gzipped outputs back to the branch
-        if: success()
-        run: |
-          mkdir -p outputs
-          gzip -n -9 -c "output/${STEM}.geojson" > "outputs/${STEM}.geojson.gz"
-          gzip -n -9 -c "output/${STEM}.osm" > "outputs/${STEM}.osm.gz"
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add -f "outputs/${STEM}.geojson.gz" "outputs/${STEM}.osm.gz"
-          if git diff --staged --quiet; then
-            echo "No output changes to commit"
-          else
-            git commit -m "Add Nanjing GloBFP output (GeoJSON + OSM, gzipped) [skip ci]"
-            git push origin "HEAD:${GITHUB_REF_NAME}"
-          fi

@@ -7,10 +7,12 @@ the area you care about — no whole-country downloads.
 You give it an **area of interest** (a lon/lat bounding box, a boundary polygon,
 or a local `.shp` / `.geojson` / `.json` file) and it:
 
-1. figures out which 3D-GloBFP **grid tiles** intersect that area,
-2. downloads **only those tiles** (zipped shapefiles on figshare),
-3. keeps the building footprints intersecting your AOI (with their `height`),
-4. writes them to a single small file (GeoJSON by default).
+1. treats your input as one complete AOI, first merging any polygons that
+   share a common boundary (or overlap) into single regions,
+2. figures out which 3D-GloBFP **grid tiles** intersect that area,
+3. downloads **only those tiles** (zipped shapefiles on figshare),
+4. keeps the building footprints intersecting your AOI (with their `height`),
+5. writes them to a single small file (GeoJSON by default).
 
 This is a Python re-implementation and extension of the ideas in the
 [`gloBFPr`](https://github.com/billbillbilly/gloBFPr) R package, adding **polygon
@@ -30,6 +32,13 @@ names into a grid of tile polygons + download URLs, and caches the result locall
 (`grid_index.geojson`). Retrieval then intersects your AOI with that grid and pulls
 only the matching tiles, caching each downloaded tile by `gridID` so repeated runs
 over the same area are fast.
+
+**AOI preprocessing.** Whatever form the AOI takes, it is treated as one
+complete area of interest. If the input contains multiple polygons, polygons
+that share a common boundary (or overlap) are first dissolved into a single
+region; polygons that are disjoint, or touch only at isolated points, are kept
+as separate parts of the AOI. Retrieval then runs against the resulting
+geometry.
 
 ## Install
 
@@ -105,11 +114,11 @@ The grid index and tiles are cached under `~/.cache/globfp-retriever` by default
 
 Because some environments block outbound access to figshare, the repo includes a
 workflow (`.github/workflows/retrieve-aoi.yml`) that runs the retrieval on a
-GitHub-hosted runner (which has internet). It downloads the tiles, crops to the
-AOI in `examples/nanjing_subdistricts.geojson` (override with the `aoi` input),
-writes GeoJSON + OSM, uploads them as a build artifact, and commits the gzipped
-outputs to `outputs/`. Trigger it via *Actions → Retrieve GloBFP for AOI → Run
-workflow*, or by pushing to the working branch.
+GitHub-hosted runner (which has internet). Trigger it via *Actions → Retrieve
+GloBFP for AOI → Run workflow* and provide either `aoi` (a repo path to a
+boundary file, or a WKT polygon) or `bbox` (`min_lon min_lat max_lon max_lat`),
+plus an optional output `format` and `clip` toggle. The cropped result is
+uploaded as a build artifact; nothing is committed to the repository.
 
 ## Coordinate obfuscation (grid cipher)
 

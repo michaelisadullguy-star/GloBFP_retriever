@@ -9,6 +9,10 @@ boundary polygon, or a local vector file (``.shp`` / ``.geojson`` / ``.json``) -
 and it downloads *only* the tiles that intersect that area, then returns/saves the
 building footprints intersecting it. You never download a whole-country dataset.
 
+The input is treated as one complete AOI: polygons that share a common boundary
+(or overlap) are merged into single regions before retrieval, while disjoint
+polygons stay separate parts of the AOI.
+
 Example
 -------
 >>> from globfp_retriever import retrieve_globfp
