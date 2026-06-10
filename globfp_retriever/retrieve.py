@@ -90,6 +90,9 @@ def retrieve_globfp(
         Area of interest: a ``(min_lon, min_lat, max_lon, max_lat)`` bbox, a ring of
         ``(lon, lat)`` pairs, a GeoJSON dict, a shapely geometry, a GeoDataFrame, or a
         path to a local vector file (``.shp`` / ``.geojson`` / ``.json`` / ...).
+        The input is treated as one complete AOI; polygons sharing a common
+        boundary (or overlapping) are merged first (see
+        :func:`globfp_retriever.aoi.merge_shared_boundaries`).
     output
         Optional output path. Format is inferred from its extension unless
         ``out_format`` is given.

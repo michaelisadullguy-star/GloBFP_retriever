@@ -8,7 +8,7 @@ from globfp_retriever import geocrypt as gc
 
 KEY = b"unit-test-key-not-secret-000000000"
 KEY2 = b"a-different-key-1111111111111111111"
-UTM = "EPSG:32650"  # Nanjing UTM zone 50N
+UTM = "EPSG:32650"  # an arbitrary metric CRS (UTM zone 50N)
 MAXSHIFT = sum(r for _, r in gc.DEFAULT_LAYERS)  # 0.75 m per axis
 
 

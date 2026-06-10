@@ -1,31 +1,40 @@
 name: Retrieve GloBFP for AOI
 
-# Runs on a GitHub-hosted runner (which has outbound internet to figshare), so it
-# can actually download the 3D-GloBFP tiles, crop them to the AOI, and write the
-# cropped buildings as GeoJSON + OSM. Results are uploaded as an artifact and
-# published on an ephemeral orphan ref that this run deletes again itself;
-# nothing is committed to any persistent branch.
+# Retrieval needs outbound HTTPS to api.figshare.com / ndownloader.figshare.com,
+# which some environments block. This workflow runs the CLI on a GitHub-hosted
+# runner (which has internet) and uploads the cropped result as a build
+# artifact; nothing is committed to the repository.
 
 on:
-  push:
-    branches: ["claude/gifted-ride-vdrhct"]
   workflow_dispatch:
     inputs:
       aoi:
-        description: "Path to the AOI file in the repo"
-        default: "examples/gaochun_subdistricts.geojson"
+        description: "AOI: repo path to a boundary file (.shp/.geojson/.json) or a WKT polygon"
         required: false
+        type: string
+      bbox:
+        description: "AOI bounding box: min_lon min_lat max_lon max_lat (WGS84)"
+        required: false
+        type: string
+      format:
+        description: "Output format"
+        required: false
+        default: "geojson"
+        type: choice
+        options: [geojson, gpkg, shp, fgb, parquet, obj, osm]
+      clip:
+        description: "Clip buildings to the AOI boundary"
+        required: false
+        default: false
+        type: boolean
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   retrieve:
     runs-on: ubuntu-latest
     timeout-minutes: 180
-    env:
-      AOI: ${{ github.event.inputs.aoi || 'examples/gaochun_subdistricts.geojson' }}
-      STEM: gaochun_buildings
     steps:
       - uses: actions/checkout@v4
 
@@ -38,51 +47,31 @@ jobs:
           python -m pip install --upgrade pip
           pip install -e .
 
-      - name: List intersecting tiles
-        run: globfp-retriever "$AOI" --cache-dir .globfp-cache --list-tiles -v
-
-      - name: Retrieve and crop (GeoJSON + OSM)
+      - name: Retrieve and crop
+        env:
+          AOI: ${{ inputs.aoi }}
+          BBOX: ${{ inputs.bbox }}
+          FORMAT: ${{ inputs.format }}
+          CLIP: ${{ inputs.clip }}
         run: |
+          if [ -z "$AOI" ] && [ -z "$BBOX" ]; then
+            echo "Provide either the 'aoi' input (file path or WKT) or the 'bbox' input." >&2
+            exit 1
+          fi
           mkdir -p output
-          globfp-retriever "$AOI" --cache-dir .globfp-cache -o "output/${STEM}.geojson" -v
-          globfp-retriever "$AOI" --cache-dir .globfp-cache -o "output/${STEM}.osm" -v
-
-      - name: Output summary
-        if: always()
-        run: ls -lh output || echo "no output directory produced"
+          args=(--cache-dir .globfp-cache -f "$FORMAT" -o "output/buildings.$FORMAT" -v)
+          if [ "$CLIP" = "true" ]; then
+            args+=(--clip)
+          fi
+          if [ -n "$AOI" ]; then
+            globfp-retriever "$AOI" "${args[@]}"
+          else
+            globfp-retriever --bbox $BBOX "${args[@]}"
+          fi
 
       - name: Upload result artifact
-        if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: gaochun-globfp
+          name: globfp-aoi-output
           path: output/
-          if-no-files-found: warn
           retention-days: 14
-
-      # Sandboxed clients can reach this repo only through git, so park the
-      # gzipped outputs on an orphan ref (no parent history, outputs only) just
-      # long enough to be fetched, then delete the ref from this same run.
-      - name: Publish outputs on an ephemeral delivery ref (self-deleting)
-        if: success()
-        run: |
-          for ext in geojson osm; do
-            gzip -n -9 -c "output/${STEM}.${ext}" > "output/${STEM}.${ext}.gz"
-          done
-          sha256sum output/*.gz | tee output/SHA256SUMS
-          REF="refs/heads/claude/tmp-delivery-${GITHUB_RUN_ID}"
-          REMOTE="https://x-access-token:${{ github.token }}@github.com/${GITHUB_REPOSITORY}.git"
-          DIR=$(mktemp -d)
-          cp output/*.gz output/SHA256SUMS "$DIR"/
-          git -C "$DIR" init -q -b delivery
-          git -C "$DIR" -c user.name="github-actions[bot]" \
-              -c user.email="github-actions[bot]@users.noreply.github.com" \
-              add -A
-          git -C "$DIR" -c user.name="github-actions[bot]" \
-              -c user.email="github-actions[bot]@users.noreply.github.com" \
-              commit -qm "Ephemeral output delivery for run ${GITHUB_RUN_ID}"
-          git -C "$DIR" push -q "$REMOTE" "HEAD:${REF}"
-          echo "Delivery ref ${REF} pushed; deleting it in 240s"
-          sleep 240
-          git -C "$DIR" push -q "$REMOTE" ":${REF}"
-          echo "Delivery ref ${REF} deleted"
