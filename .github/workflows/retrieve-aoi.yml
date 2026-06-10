@@ -2,29 +2,29 @@ name: Retrieve GloBFP for AOI
 
 # Runs on a GitHub-hosted runner (which has outbound internet to figshare), so it
 # can actually download the 3D-GloBFP tiles, crop them to the AOI, and write the
-# cropped buildings as GeoJSON + OSM (uploaded as an artifact and committed back
-# gzipped).
+# cropped buildings as GeoJSON + OSM. Results are uploaded as an artifact and
+# emitted base64-gzipped in the job log; nothing is committed back.
 
 on:
   push:
-    branches: ["claude/cool-newton-Szorb"]
+    branches: ["claude/gifted-ride-vdrhct"]
   workflow_dispatch:
     inputs:
       aoi:
         description: "Path to the AOI file in the repo"
-        default: "examples/nanjing_subdistricts.geojson"
+        default: "examples/gaochun_subdistricts.geojson"
         required: false
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   retrieve:
     runs-on: ubuntu-latest
     timeout-minutes: 180
     env:
-      AOI: ${{ github.event.inputs.aoi || 'examples/nanjing_subdistricts.geojson' }}
-      STEM: nanjing_buildings
+      AOI: ${{ github.event.inputs.aoi || 'examples/gaochun_subdistricts.geojson' }}
+      STEM: gaochun_buildings
     steps:
       - uses: actions/checkout@v4
 
@@ -54,23 +54,21 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: nanjing-globfp
+          name: gaochun-globfp
           path: output/
           if-no-files-found: warn
           retention-days: 14
 
-      - name: Commit gzipped outputs back to the branch
+      - name: Emit gzipped outputs as base64 in the log
         if: success()
         run: |
-          mkdir -p outputs
-          gzip -n -9 -c "output/${STEM}.geojson" > "outputs/${STEM}.geojson.gz"
-          gzip -n -9 -c "output/${STEM}.osm" > "outputs/${STEM}.osm.gz"
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add -f "outputs/${STEM}.geojson.gz" "outputs/${STEM}.osm.gz"
-          if git diff --staged --quiet; then
-            echo "No output changes to commit"
-          else
-            git commit -m "Add Nanjing GloBFP output (GeoJSON + OSM, gzipped) [skip ci]"
-            git push origin "HEAD:${GITHUB_REF_NAME}"
-          fi
+          for ext in geojson osm; do
+            gzip -n -9 -c "output/${STEM}.${ext}" > "output/${STEM}.${ext}.gz"
+          done
+          sha256sum output/*.gz
+          for ext in geojson osm; do
+            f="output/${STEM}.${ext}.gz"
+            echo "=====BEGIN-B64:${STEM}.${ext}.gz====="
+            base64 -w 76 "$f"
+            echo "=====END-B64:${STEM}.${ext}.gz====="
+          done
