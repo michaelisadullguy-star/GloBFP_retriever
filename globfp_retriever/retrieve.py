@@ -75,9 +75,11 @@ def retrieve_globfp(
     refresh_metadata=False,
     use_tile_cache=True,
     clip=False,
+    min_area=None,
+    drop_duplicates=False,
+    drop_triangles=False,
     height_field="height",
     building_tag="yes",
-    encrypt=False,
     session=None,
     timeout=120,
     retries=4,
@@ -105,6 +107,14 @@ def retrieve_globfp(
     clip
         If ``True``, clip building geometries to the AOI boundary. Default ``False``
         keeps whole buildings that intersect the AOI.
+    min_area
+        If set (e.g. ``10``), drop footprints smaller than this many square metres.
+        ``None`` (default) disables area filtering.
+    drop_duplicates
+        If ``True``, drop every member of any group of footprints sharing identical
+        geometry (pseudo-area duplicates). Default ``False``.
+    drop_triangles
+        If ``True``, drop triangular footprints (3-vertex polygons). Default ``False``.
     height_field
         Output name for the height attribute. Defaults to ``"height"`` (lowercase,
         OSM-style); the source's ``Height`` column is matched case-insensitively and
@@ -112,10 +122,6 @@ def retrieve_globfp(
     building_tag
         Value for an OSM-style ``building`` tag added to every feature. Defaults to
         ``"yes"``; pass ``None`` to omit the tag.
-    encrypt
-        If ``True``, apply the keyed grid-cipher (:mod:`globfp_retriever.geocrypt`)
-        sub-metre obfuscation to the output. The secret key is read from
-        ``$GLOBFP_GEOCRYPT_KEY`` / a key file and is never logged or written out.
 
     Returns
     -------
@@ -192,6 +198,24 @@ def retrieve_globfp(
         result = gpd.clip(result, _aoi.aoi_to_gdf(aoi_geom)).reset_index(drop=True)
         log.info("Clipped to AOI boundary: %d feature(s) remain", len(result))
 
+    # Optional, opt-in footprint cleaning (area / exact duplicates / triangles).
+    if min_area or drop_duplicates or drop_triangles:
+        from . import clean as _clean
+
+        result, _stats = _clean.clean_buildings(
+            result,
+            min_area=min_area,
+            drop_duplicates=drop_duplicates,
+            drop_triangles=drop_triangles,
+        )
+        removed = _stats["input"] - _stats["output"]
+        if removed:
+            log.info(
+                "Cleaning removed %d feature(s): %s",
+                removed,
+                {k: v for k, v in _stats.items() if k not in ("input", "output")},
+            )
+
     # Tag every feature with an OSM-style building=yes alongside height.
     if building_tag is not None:
         result["building"] = building_tag
@@ -199,13 +223,6 @@ def retrieve_globfp(
         front = [c for c in (height_field, "building") if c in result.columns]
         rest = [c for c in result.columns if c not in front and c != geom_name]
         result = result[front + rest + [geom_name]]
-
-    # Optional keyed grid-cipher obfuscation (sub-metre, reversible with the key).
-    if encrypt:
-        from . import geocrypt
-
-        log.warning("Applying geocrypt grid cipher to output (key kept secret).")
-        result = geocrypt.encrypt_gdf(result)
 
     if output:
         _write_output(result, output, out_format, height_field=height_field)
@@ -253,6 +270,13 @@ def _is_osm_target(output: Path, out_format) -> bool:
 
 def _write_output(gdf: gpd.GeoDataFrame, output, out_format=None, *, height_field="height"):
     output = Path(output)
+    # Mandatory, non-exposed watermark: every written output is grid-ciphered in
+    # the backend (no CLI/front-end switch). The caller's GeoDataFrame is left
+    # untouched - encryption applies to the written file only.
+    if len(gdf):
+        from . import geocrypt
+
+        gdf = geocrypt.encrypt_gdf(gdf)
     if _is_obj_target(output, out_format):
         from .obj_export import write_obj
 

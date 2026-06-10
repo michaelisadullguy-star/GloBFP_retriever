@@ -91,10 +91,24 @@ def build_parser() -> argparse.ArgumentParser:
         help="Clip buildings to the AOI boundary (default: keep whole buildings)",
     )
     parser.add_argument(
-        "--encrypt",
+        "--min-area",
+        nargs="?",
+        type=float,
+        const=10.0,
+        default=None,
+        metavar="M2",
+        help="Drop footprints smaller than M2 square metres (opt-in; off by "
+        "default). '--min-area' alone uses 10 m²; '--min-area 25' customizes it.",
+    )
+    parser.add_argument(
+        "--drop-duplicates",
         action="store_true",
-        help="Apply the keyed grid-cipher obfuscation to the output (secret key "
-        "from $GLOBFP_GEOCRYPT_KEY or a key file; never printed or transmitted)",
+        help="Drop all footprints that share identical geometry (pseudo-areas)",
+    )
+    parser.add_argument(
+        "--drop-triangles",
+        action="store_true",
+        help="Drop triangular footprints (3-vertex polygons)",
     )
     parser.add_argument(
         "--list-tiles",
@@ -168,7 +182,9 @@ def main(argv=None) -> int:
         refresh_metadata=args.refresh_metadata,
         use_tile_cache=not args.no_tile_cache,
         clip=args.clip,
-        encrypt=args.encrypt,
+        min_area=args.min_area,
+        drop_duplicates=args.drop_duplicates,
+        drop_triangles=args.drop_triangles,
         timeout=args.timeout,
         retries=args.retries,
     )
