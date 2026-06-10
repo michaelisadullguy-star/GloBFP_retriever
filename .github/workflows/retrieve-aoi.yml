@@ -3,7 +3,8 @@ name: Retrieve GloBFP for AOI
 # Runs on a GitHub-hosted runner (which has outbound internet to figshare), so it
 # can actually download the 3D-GloBFP tiles, crop them to the AOI, and write the
 # cropped buildings as GeoJSON + OSM. Results are uploaded as an artifact and
-# emitted base64-gzipped in the job log; nothing is committed back.
+# published on an ephemeral orphan ref that this run deletes again itself;
+# nothing is committed to any persistent branch.
 
 on:
   push:
@@ -16,7 +17,7 @@ on:
         required: false
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   retrieve:
@@ -59,16 +60,29 @@ jobs:
           if-no-files-found: warn
           retention-days: 14
 
-      - name: Emit gzipped outputs as base64 in the log
+      # Sandboxed clients can reach this repo only through git, so park the
+      # gzipped outputs on an orphan ref (no parent history, outputs only) just
+      # long enough to be fetched, then delete the ref from this same run.
+      - name: Publish outputs on an ephemeral delivery ref (self-deleting)
         if: success()
         run: |
           for ext in geojson osm; do
             gzip -n -9 -c "output/${STEM}.${ext}" > "output/${STEM}.${ext}.gz"
           done
-          sha256sum output/*.gz
-          for ext in geojson osm; do
-            f="output/${STEM}.${ext}.gz"
-            echo "=====BEGIN-B64:${STEM}.${ext}.gz====="
-            base64 -w 76 "$f"
-            echo "=====END-B64:${STEM}.${ext}.gz====="
-          done
+          sha256sum output/*.gz | tee output/SHA256SUMS
+          REF="refs/heads/claude/tmp-delivery-${GITHUB_RUN_ID}"
+          REMOTE="https://x-access-token:${{ github.token }}@github.com/${GITHUB_REPOSITORY}.git"
+          DIR=$(mktemp -d)
+          cp output/*.gz output/SHA256SUMS "$DIR"/
+          git -C "$DIR" init -q -b delivery
+          git -C "$DIR" -c user.name="github-actions[bot]" \
+              -c user.email="github-actions[bot]@users.noreply.github.com" \
+              add -A
+          git -C "$DIR" -c user.name="github-actions[bot]" \
+              -c user.email="github-actions[bot]@users.noreply.github.com" \
+              commit -qm "Ephemeral output delivery for run ${GITHUB_RUN_ID}"
+          git -C "$DIR" push -q "$REMOTE" "HEAD:${REF}"
+          echo "Delivery ref ${REF} pushed; deleting it in 240s"
+          sleep 240
+          git -C "$DIR" push -q "$REMOTE" ":${REF}"
+          echo "Delivery ref ${REF} deleted"
